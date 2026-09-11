@@ -1,0 +1,23 @@
+# Environments & Virtual Envs
+venv/
+env/
+.venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment Variables & Secrets
+.env
+.env.local
+
+# Local Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Vercel & IDE
+.vercel/
+.vscode/
+.idea/
