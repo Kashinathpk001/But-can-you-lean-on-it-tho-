@@ -21,6 +21,36 @@ if not os.path.exists(STATIC_DIR):
 
 app = Flask(__name__, template_folder=TEMPLATES_DIR, static_folder=STATIC_DIR)
 
+
+class VercelPathMiddleware:
+    """WSGI middleware to normalize PATH_INFO from Vercel's serverless rewrites."""
+
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        matched = (
+            environ.get("HTTP_X_MATCHED_PATH")
+            or environ.get("HTTP_X_VERCEL_MATCHED_PATH")
+            or environ.get("HTTP_X_FORWARDED_URI")
+            or environ.get("HTTP_X_ORIGINAL_URI")
+        )
+        if matched:
+            environ["PATH_INFO"] = matched.split("?")[0] or "/"
+        else:
+            path_info = environ.get("PATH_INFO", "")
+            if path_info.startswith("/api/index"):
+                rest = path_info[len("/api/index"):]
+                environ["PATH_INFO"] = rest if rest else "/"
+            elif path_info.startswith("/api"):
+                rest = path_info[len("/api"):]
+                environ["PATH_INFO"] = rest if rest else "/"
+
+        return self.wsgi_app(environ, start_response)
+
+
+app.wsgi_app = VercelPathMiddleware(app.wsgi_app)
+
 # Database configuration (environment variables with local defaults)
 DB_HOST = (os.environ.get("DB_HOST") or "").strip() or "localhost"
 DB_USER = (os.environ.get("DB_USER") or "").strip() or "root"
