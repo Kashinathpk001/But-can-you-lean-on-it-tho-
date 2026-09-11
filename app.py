@@ -29,14 +29,31 @@ class VercelPathMiddleware:
         self.wsgi_app = wsgi_app
 
     def __call__(self, environ, start_response):
-        matched = (
-            environ.get("HTTP_X_MATCHED_PATH")
-            or environ.get("HTTP_X_VERCEL_MATCHED_PATH")
+        import urllib.parse
+
+        # 1. Check for explicit path passed by Vercel rewrite in query parameter __path
+        query_string = environ.get("QUERY_STRING", "")
+        parsed_qs = urllib.parse.parse_qs(query_string)
+
+        if "__path" in parsed_qs:
+            raw_path = parsed_qs["__path"][0]
+            raw_path = "/" + raw_path.lstrip("/")
+            environ["PATH_INFO"] = raw_path
+
+            # Remove __path from QUERY_STRING so request.args remains pristine
+            clean_params = [(k, v) for k, vs in parsed_qs.items() if k != "__path" for v in vs]
+            environ["QUERY_STRING"] = urllib.parse.urlencode(clean_params)
+        elif (
+            environ.get("HTTP_X_INVOKE_PATH")
             or environ.get("HTTP_X_FORWARDED_URI")
             or environ.get("HTTP_X_ORIGINAL_URI")
-        )
-        if matched:
-            environ["PATH_INFO"] = matched.split("?")[0] or "/"
+        ):
+            target = (
+                environ.get("HTTP_X_INVOKE_PATH")
+                or environ.get("HTTP_X_FORWARDED_URI")
+                or environ.get("HTTP_X_ORIGINAL_URI")
+            )
+            environ["PATH_INFO"] = target.split("?")[0] or "/"
         else:
             path_info = environ.get("PATH_INFO", "")
             if path_info.startswith("/api/index"):
